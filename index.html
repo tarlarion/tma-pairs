@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Memory pairs</title>
+  <link rel="stylesheet" href="../tma-shared/tma-theme.css" />
+  <link rel="stylesheet" href="../tma-shared/tma-loading.css" />
+  <link rel="stylesheet" href="game.css" />
+</head>
+<body>
+  <div class="celebration-confetti" id="celebration-confetti" aria-hidden="true"></div>
+  <div class="finish-fx" id="finish-fx" aria-hidden="true">
+    <span class="finish-orb"></span>
+    <span class="finish-orb"></span>
+    <span class="finish-orb"></span>
+    <span class="finish-orb"></span>
+    <span class="finish-orb"></span>
+    <span class="finish-spark"></span>
+    <span class="finish-spark"></span>
+    <span class="finish-spark"></span>
+    <span class="finish-spark"></span>
+    <span class="finish-spark"></span>
+    <span class="finish-spark"></span>
+    <span class="finish-spark"></span>
+    <span class="finish-spark"></span>
+    <span class="finish-ray"></span>
+  </div>
+  <div class="app">
+    <!-- Стартовый экран -->
+    <div id="screen-start" class="screen active">
+      <h1 class="start-title" id="start-title"></h1>
+      <p class="start-desc" id="start-desc"></p>
+      <button type="button" class="btn" id="btn-start"></button>
+    </div>
+
+    <!-- Игровой экран -->
+    <div id="screen-game" class="screen">
+      <div class="hooray" id="hooray" aria-live="polite"></div>
+      <div class="game-header">
+        <span class="game-score" id="game-score"><span id="game-score-label"></span> <span id="score-count">0</span></span>
+        <span class="timer" id="timer">60</span>
+      </div>
+      <div class="game-progress" aria-hidden="true">
+        <div class="game-progress-fill" id="timer-progress"></div>
+      </div>
+      <div class="preview-banner" id="preview-banner" aria-live="polite">
+        <p class="preview-banner-title" id="preview-banner-title"></p>
+      </div>
+      <div class="cards-grid" id="cards-grid"></div>
+    </div>
+
+    <!-- Финишный экран -->
+    <div id="screen-finish" class="screen">
+      <div class="finish-header">
+        <h2 class="finish-title" id="finish-title"></h2>
+      </div>
+      <div class="finish-score" id="finish-score">0</div>
+      <div class="finish-score-label" id="finish-score-label"></div>
+      <div class="finish-buttons">
+        <button type="button" class="btn" id="btn-repeat"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Locales: JSON sources are locales/en.json + locales/ru.json; run `node locales/build-messages.js` after editing them. -->
+  <script src="locales/messages.js"></script>
+  <script src="../tma-shared/tma-loading.js"></script>
+  <script>
+    (function () {
+      const SUPPORTED_LOCALES = ['ru', 'en'];
+      const DEFAULT_LOCALE = 'en';
+      /** Set to 0 to skip fake delay; replace with real preload tasks in `tasks`. */
+      const LOADING_EMULATE_MS = 3000;
+      const TOTAL_SEC = 60;
+      const PREVIEW_MS = 3000;
+      const ANIMALS = ['🌳','🌲','🌵','🌸','🌼','🌷','🌻','🍄','🪷','🌾','🍃','🌿','🌙','☘️','🌴','🌧️'];
+      const PAIRS_PER_ROUND = 6;
+      const CONFETTI_COLORS = ['#9dd9a8', '#4a9d5c', '#fbbf24', '#f472b6', '#a78bfa', '#34d399', '#f87171', '#fff'];
+      const CONFETTI_SHAPES = ['rect', 'circle', 'star'];
+
+      function detectLocale() {
+        const params = new URLSearchParams(window.location.search);
+        const fromQuery = params.get('lang');
+        if (fromQuery) {
+          const base = fromQuery.toLowerCase().split('-')[0];
+          if (SUPPORTED_LOCALES.includes(base)) return base;
+        }
+        const candidates = navigator.languages && navigator.languages.length
+          ? navigator.languages
+          : [navigator.language];
+        for (let i = 0; i < candidates.length; i++) {
+          const tag = candidates[i];
+          if (!tag) continue;
+          const lower = tag.toLowerCase();
+          const base = lower.split('-')[0];
+          if (SUPPORTED_LOCALES.includes(lower)) return lower;
+          if (SUPPORTED_LOCALES.includes(base)) return base;
+        }
+        return DEFAULT_LOCALE;
+      }
+
+      function resolveMessages(locale) {
+        const bundle = window.TMA_I18N;
+        if (!bundle || typeof bundle !== 'object') {
+          console.error('Missing window.TMA_I18N — load locales/messages.js before this script.');
+          return {};
+        }
+        const chosen = bundle[locale] || bundle[DEFAULT_LOCALE];
+        if (chosen && typeof chosen === 'object') return chosen;
+        return bundle[DEFAULT_LOCALE] && typeof bundle[DEFAULT_LOCALE] === 'object'
+          ? bundle[DEFAULT_LOCALE]
+          : {};
+      }
+
+      let messages = {};
+
+      function t(key) {
+        const parts = key.split('.');
+        let cur = messages;
+        for (let i = 0; i < parts.length; i++) {
+          if (cur == null || typeof cur !== 'object') return key;
+          cur = cur[parts[i]];
+        }
+        if (typeof cur === 'string' || typeof cur === 'number') return String(cur);
+        return key;
+      }
+
+      function tArray(key) {
+        const parts = key.split('.');
+        let cur = messages;
+        for (let i = 0; i < parts.length; i++) {
+          if (cur == null || typeof cur !== 'object') return [];
+          cur = cur[parts[i]];
+        }
+        return Array.isArray(cur) ? cur : [];
+      }
+
+      const activeLocale = detectLocale();
+      messages = resolveMessages(activeLocale);
+      document.documentElement.lang = activeLocale === 'ru' ? 'ru' : 'en';
+
+      const screenStart = document.getElementById('screen-start');
+      const screenGame = document.getElementById('screen-game');
+      const screenFinish = document.getElementById('screen-finish');
+      const btnStart = document.getElementById('btn-start');
+      const btnRepeat = document.getElementById('btn-repeat');
+      const timerEl = document.getElementById('timer');
+      const timerProgressEl = document.getElementById('timer-progress');
+      const scoreCountEl = document.getElementById('score-count');
+      const gameScoreLabelEl = document.getElementById('game-score-label');
+      const cardsGrid = document.getElementById('cards-grid');
+      const previewBanner = document.getElementById('preview-banner');
+      const previewBannerTitleEl = document.getElementById('preview-banner-title');
+      const finishScore = document.getElementById('finish-score');
+      const hoorayEl = document.getElementById('hooray');
+      const confettiContainer = document.getElementById('celebration-confetti');
+
+      function applyStaticCopy() {
+        document.title = t('meta.title');
+        document.getElementById('start-title').textContent = t('start.title');
+        document.getElementById('start-desc').textContent = t('start.description');
+        btnStart.textContent = t('start.buttonStart');
+        hoorayEl.textContent = t('game.hoorayFallback');
+        gameScoreLabelEl.textContent = t('game.pairsFoundLabel');
+        previewBannerTitleEl.textContent = t('game.previewTitle');
+        cardsGrid.setAttribute('aria-label', t('game.cardsGridAriaLabel'));
+        document.getElementById('finish-title').textContent = t('finish.title');
+        document.getElementById('finish-score-label').textContent = t('finish.scoreLabel');
+        btnRepeat.textContent = t('finish.buttonEndTraining');
+      }
+
+      applyStaticCopy();
+
+      window.TMA_LOADING.run({
+        title: t('meta.title'),
+        status: t('loading.status'),
+        icon: '✦',
+        emulateMs: LOADING_EMULATE_MS,
+        onReady: function () {
+          showScreen(screenStart);
+        },
+      });
+
+      function playCelebration() {
+        const phrases = tArray('game.celebrationPhrases');
+        const phrase = phrases.length
+          ? phrases[Math.floor(Math.random() * phrases.length)]
+          : t('game.hoorayFallback');
+        hoorayEl.textContent = phrase;
+        hoorayEl.classList.remove('play');
+        void hoorayEl.offsetWidth;
+        hoorayEl.classList.add('play');
+        setTimeout(() => hoorayEl.classList.remove('play'), 1100);
+
+        confettiContainer.innerHTML = '';
+        const count = 55;
+        for (let i = 0; i < count; i++) {
+          const piece = document.createElement('div');
+          piece.className = 'confetti-piece ' + CONFETTI_SHAPES[Math.floor(Math.random() * CONFETTI_SHAPES.length)] + ' fall';
+          piece.style.background = CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)];
+          const angle = (Math.PI * 2 * i) / count + Math.random() * 0.5;
+          const dist = 80 + Math.random() * 250;
+          const tx = Math.cos(angle) * dist + (Math.random() - 0.5) * 80;
+          const ty = Math.sin(angle) * dist + (Math.random() - 0.5) * 80 + 100;
+          piece.style.setProperty('--confetti-end', `translate(${tx}px, ${ty}px)`);
+          piece.style.setProperty('--confetti-rotate', (Math.random() * 720 - 360) + 'deg');
+          piece.style.animationDelay = (Math.random() * 0.3) + 's';
+          const size = 6 + Math.random() * 8;
+          piece.style.width = size + 'px';
+          piece.style.height = size + 'px';
+          piece.style.marginLeft = (-size / 2) + 'px';
+          piece.style.marginTop = (-size / 2) + 'px';
+          confettiContainer.appendChild(piece);
+        }
+        for (let s = 0; s < 8; s++) {
+          const spark = document.createElement('div');
+          spark.className = 'confetti-piece sparkle';
+          const a = Math.random() * Math.PI * 2;
+          const d = 40 + Math.random() * 60;
+          const sx = Math.cos(a) * d;
+          const sy = Math.sin(a) * d;
+          spark.style.setProperty('--confetti-end', `translate(${sx}px, ${sy}px)`);
+          spark.style.animationDelay = (Math.random() * 0.15) + 's';
+          confettiContainer.appendChild(spark);
+        }
+        setTimeout(() => { confettiContainer.innerHTML = ''; }, 2500);
+      }
+
+      let timerId = null;
+      let previewTimeoutId = null;
+      let gameStartTime = 0;
+      let correctCount = 0;
+      let firstOpenIndex = null;
+      let isBoardLocked = false;
+      let isPreviewPhase = false;
+      let currentField = [];
+
+      function clearPreviewTimeout() {
+        if (previewTimeoutId) {
+          clearTimeout(previewTimeoutId);
+          previewTimeoutId = null;
+        }
+      }
+
+      function hidePreviewBanner() {
+        previewBanner.classList.remove('is-active');
+      }
+
+      function showPreviewBanner() {
+        previewBannerTitleEl.textContent = t('game.previewTitle');
+        previewBanner.classList.add('is-active');
+      }
+
+      function endMemorizePreviewCommon() {
+        hidePreviewBanner();
+        isPreviewPhase = false;
+        isBoardLocked = false;
+        cardsGrid.classList.remove('cards-grid--preview');
+        cardsGrid.querySelectorAll('.card:not(.matched)').forEach(function (el) {
+          el.classList.remove('open');
+        });
+      }
+
+      function beginMemorizePreview(onComplete) {
+        clearPreviewTimeout();
+        isPreviewPhase = true;
+        isBoardLocked = true;
+        firstOpenIndex = null;
+        cardsGrid.querySelectorAll('.card').forEach(function (el) {
+          el.classList.add('open');
+        });
+        cardsGrid.classList.add('cards-grid--preview');
+        showPreviewBanner();
+        previewTimeoutId = setTimeout(function () {
+          previewTimeoutId = null;
+          onComplete();
+        }, PREVIEW_MS);
+      }
+
+      function endInitialMemorizePreview() {
+        endMemorizePreviewCommon();
+        gameStartTime = Date.now();
+        timerId = setInterval(tick, TICK_MS);
+      }
+
+      function endInterRoundMemorizePreview(secondsLeftFrozen) {
+        endMemorizePreviewCommon();
+        gameStartTime = Date.now() - (TOTAL_SEC - secondsLeftFrozen) * 1000;
+        timerId = setInterval(tick, TICK_MS);
+      }
+
+      function showScreen(screen) {
+        [screenStart, screenGame, screenFinish].forEach(s => s.classList.remove('active'));
+        screen.classList.add('active');
+        document.body.classList.toggle('finish-active', screen === screenFinish);
+      }
+
+      function shuffle(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [array[i], array[j]] = [array[j], array[i]];
+        }
+        return array;
+      }
+
+      function generateField() {
+        const animals = shuffle(ANIMALS.slice()).slice(0, PAIRS_PER_ROUND);
+        const cards = [];
+        animals.forEach((emoji, idx) => {
+          const pairId = idx;
+          cards.push({ id: pairId * 2, pairId, emoji, matched: false });
+          cards.push({ id: pairId * 2 + 1, pairId, emoji, matched: false });
+        });
+        shuffle(cards);
+        currentField = cards;
+      }
+
+      function renderField() {
+        cardsGrid.innerHTML = '';
+        const cardAria = t('game.cardAriaLabel');
+        currentField.forEach((card, index) => {
+          const cardEl = document.createElement('button');
+          cardEl.type = 'button';
+          cardEl.className = 'card';
+          cardEl.dataset.index = String(index);
+          cardEl.setAttribute('aria-label', cardAria);
+
+          const front = document.createElement('div');
+          front.className = 'card-inner card-front';
+          front.textContent = '✦';
+
+          const back = document.createElement('div');
+          back.className = 'card-inner card-back';
+          back.textContent = card.emoji;
+
+          cardEl.appendChild(front);
+          cardEl.appendChild(back);
+
+          if (card.matched) {
+            cardEl.classList.add('matched', 'open');
+          }
+
+          cardEl.addEventListener('click', () => handleCardClick(index, cardEl));
+          cardsGrid.appendChild(cardEl);
+        });
+      }
+
+      function prepareFreshField() {
+        firstOpenIndex = null;
+        generateField();
+        renderField();
+      }
+
+      function isBoardFullyMatched() {
+        return currentField.length > 0 && currentField.every(function (c) {
+          return c.matched;
+        });
+      }
+
+      function handleCardClick(index, cardEl) {
+        if (isPreviewPhase) return;
+        if (isBoardLocked) return;
+        const card = currentField[index];
+        if (!card || card.matched) return;
+
+        if (firstOpenIndex === index) return;
+
+        cardEl.classList.add('open');
+
+        if (firstOpenIndex === null) {
+          firstOpenIndex = index;
+          return;
+        }
+
+        const firstCard = currentField[firstOpenIndex];
+        const firstEl = cardsGrid.querySelector('[data-index="' + firstOpenIndex + '"]');
+
+        if (!firstCard || !firstEl) {
+          firstOpenIndex = null;
+          return;
+        }
+
+        isBoardLocked = true;
+
+        if (firstCard.pairId === card.pairId) {
+          firstCard.matched = true;
+          card.matched = true;
+          firstEl.classList.add('matched');
+          cardEl.classList.add('matched');
+
+          correctCount++;
+          scoreCountEl.textContent = correctCount;
+          playCelebration();
+
+          setTimeout(function () {
+            firstOpenIndex = null;
+            if (!isBoardFullyMatched()) {
+              isBoardLocked = false;
+              return;
+            }
+            if (timerId) {
+              clearInterval(timerId);
+              timerId = null;
+            }
+            const secondsLeft = Math.max(0, TOTAL_SEC - (Date.now() - gameStartTime) / 1000);
+            if (secondsLeft <= 0) {
+              endGame();
+              return;
+            }
+            prepareFreshField();
+            beginMemorizePreview(function () {
+              endInterRoundMemorizePreview(secondsLeft);
+            });
+          }, 800);
+        } else {
+          setTimeout(() => {
+            firstEl.classList.remove('open');
+            cardEl.classList.remove('open');
+            isBoardLocked = false;
+            firstOpenIndex = null;
+          }, 700);
+        }
+      }
+
+      const TICK_MS = 50;
+
+      function tick() {
+        const elapsed = (Date.now() - gameStartTime) / 1000;
+        const timeRemaining = Math.max(0, TOTAL_SEC - elapsed);
+        const pct = (timeRemaining / TOTAL_SEC) * 100;
+        timerEl.textContent = timeRemaining.toFixed(2);
+        timerProgressEl.style.width = pct + '%';
+        if (timeRemaining <= 10) {
+          timerEl.classList.add('warning');
+          timerProgressEl.classList.add('warning');
+        }
+        if (timeRemaining <= 0) {
+          clearInterval(timerId);
+          timerId = null;
+          endGame();
+        }
+      }
+
+      function startGame() {
+        clearPreviewTimeout();
+        hidePreviewBanner();
+        if (timerId) {
+          clearInterval(timerId);
+          timerId = null;
+        }
+        correctCount = 0;
+        scoreCountEl.textContent = correctCount;
+        timerEl.textContent = TOTAL_SEC.toFixed(2);
+        timerEl.classList.remove('warning');
+        timerProgressEl.style.width = '100%';
+        timerProgressEl.classList.remove('warning');
+        gameStartTime = 0;
+        prepareFreshField();
+        showScreen(screenGame);
+        beginMemorizePreview(endInitialMemorizePreview);
+      }
+
+      function endGame() {
+        clearPreviewTimeout();
+        hidePreviewBanner();
+        if (timerId) {
+          clearInterval(timerId);
+          timerId = null;
+        }
+        isPreviewPhase = false;
+        isBoardLocked = false;
+        cardsGrid.classList.remove('cards-grid--preview');
+        showScreen(screenFinish);
+        finishScore.textContent = correctCount;
+      }
+
+      btnStart.addEventListener('click', startGame);
+      btnRepeat.addEventListener('click', () => { showScreen(screenStart); });
+    })();
+  </script>
+</body>
+</html>

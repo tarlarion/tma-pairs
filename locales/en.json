@@ -1,0 +1,41 @@
+{
+  "meta": {
+    "title": "Memory pairs"
+  },
+  "loading": {
+    "status": "Loading…"
+  },
+  "start": {
+    "title": "Memory pairs",
+    "description": "Cards will appear on the board. Flip two at a time: matching pairs stay face up. Find every pair on the board; when it is cleared and time is left, a new board appears — for a few seconds all cards are face up so you can memorize them, then play continues on the same timer.\nYou have 60 seconds.",
+    "buttonStart": "Start"
+  },
+  "game": {
+    "pairsFoundLabel": "Pairs found:",
+    "previewTitle": "Memorize the card positions",
+    "cardsGridAriaLabel": "Card board",
+    "cardAriaLabel": "Card, flip to reveal",
+    "hoorayFallback": "Hooray!",
+    "celebrationPhrases": [
+      "Hooray!",
+      "Nice!",
+      "Great!",
+      "Yes!",
+      "Perfect!",
+      "Awesome!",
+      "Bravo!",
+      "Well done!",
+      "Correct!",
+      "You got it!",
+      "Beautiful!",
+      "Crushed it!",
+      "Spot on!",
+      "Legend!"
+    ]
+  },
+  "finish": {
+    "title": "Game over",
+    "scoreLabel": "pairs cleared",
+    "buttonEndTraining": "End training"
+  }
+}
