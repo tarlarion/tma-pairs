@@ -36,6 +36,6 @@
   "finish": {
     "title": "Game over",
     "scoreLabel": "pairs cleared",
-    "buttonEndTraining": "End training"
+    "buttonClaimReward": "Claim reward"
   }
 }

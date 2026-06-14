@@ -41,7 +41,7 @@ window.TMA_I18N = {
     "finish": {
       "title": "Игра окончена",
       "scoreLabel": "отгадано пар",
-      "buttonEndTraining": "Завершить тренировку"
+      "buttonClaimReward": "Забрать награду"
     }
   },
   "en": {
@@ -82,7 +82,7 @@ window.TMA_I18N = {
     "finish": {
       "title": "Game over",
       "scoreLabel": "pairs cleared",
-      "buttonEndTraining": "End training"
+      "buttonClaimReward": "Claim reward"
     }
   }
 }

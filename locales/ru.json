@@ -36,6 +36,6 @@
   "finish": {
     "title": "Игра окончена",
     "scoreLabel": "отгадано пар",
-    "buttonEndTraining": "Завершить тренировку"
+    "buttonClaimReward": "Забрать награду"
   }
 }

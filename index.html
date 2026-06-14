@@ -13,9 +13,6 @@
   <div class="finish-fx" id="finish-fx" aria-hidden="true">
     <span class="finish-orb"></span>
     <span class="finish-orb"></span>
-    <span class="finish-orb"></span>
-    <span class="finish-orb"></span>
-    <span class="finish-orb"></span>
     <span class="finish-spark"></span>
     <span class="finish-spark"></span>
     <span class="finish-spark"></span>
@@ -25,6 +22,12 @@
     <span class="finish-spark"></span>
     <span class="finish-spark"></span>
     <span class="finish-ray"></span>
+    <span class="finish-burst"></span>
+    <span class="finish-burst finish-burst--alt"></span>
+    <span class="finish-spotlight finish-spotlight--a"></span>
+    <span class="finish-spotlight finish-spotlight--b"></span>
+    <span class="finish-spotlight finish-spotlight--c"></span>
+    <span class="finish-spotlight finish-spotlight--d"></span>
   </div>
   <div class="app">
     <!-- Стартовый экран -->
@@ -54,11 +57,52 @@
     <div id="screen-finish" class="screen">
       <div class="finish-header">
         <h2 class="finish-title" id="finish-title"></h2>
+        <div class="finish-score-block">
+          <div class="finish-score" id="finish-score">0</div>
+          <div class="finish-score-label" id="finish-score-label"></div>
+        </div>
       </div>
-      <div class="finish-score" id="finish-score">0</div>
-      <div class="finish-score-label" id="finish-score-label"></div>
-      <div class="finish-buttons">
-        <button type="button" class="btn" id="btn-repeat"></button>
+      <div class="finish-chest-stage" id="finish-chest-stage" aria-hidden="true">
+        <div class="treasure-chest">
+          <div class="chest-light-beam" aria-hidden="true"></div>
+          <div class="chest-shadow"></div>
+          <div class="chest-cavity">
+            <div class="chest-glow"></div>
+            <div class="chest-coins">
+              <span class="chest-coin"></span>
+              <span class="chest-coin"></span>
+              <span class="chest-coin"></span>
+              <span class="chest-coin"></span>
+              <span class="chest-coin"></span>
+            </div>
+          </div>
+          <div class="chest-volume" aria-hidden="true">
+            <div class="chest-volume-rim"></div>
+            <div class="chest-volume-back"></div>
+          </div>
+          <div class="chest-body">
+            <div class="chest-plank"></div>
+            <div class="chest-plank"></div>
+          </div>
+          <div class="chest-shell-back" aria-hidden="true"></div>
+          <div class="chest-lock"></div>
+          <div class="chest-lid">
+            <div class="chest-lid-dome"></div>
+            <div class="chest-lid-inner"></div>
+          </div>
+          <div class="chest-coin-burst" id="chest-coin-burst" aria-hidden="true"></div>
+          <span class="chest-sparkle"></span>
+          <span class="chest-sparkle"></span>
+          <span class="chest-sparkle"></span>
+          <span class="chest-sparkle"></span>
+          <span class="chest-sparkle"></span>
+          <span class="chest-sparkle"></span>
+        </div>
+      </div>
+      <div class="finish-results" id="finish-results">
+        <div class="finish-buttons">
+          <button type="button" class="btn" id="btn-repeat"></button>
+        </div>
       </div>
     </div>
   </div>
@@ -70,14 +114,17 @@
     (function () {
       const SUPPORTED_LOCALES = ['ru', 'en'];
       const DEFAULT_LOCALE = 'en';
+      const urlParams = new URLSearchParams(window.location.search);
       /** Set to 0 to skip fake delay; replace with real preload tasks in `tasks`. */
       const LOADING_EMULATE_MS = 3000;
-      const TOTAL_SEC = 60;
+      const TOTAL_SEC = urlParams.get('time') ? Math.max(3, Number(urlParams.get('time')) || 60) : 60;
       const PREVIEW_MS = 3000;
       const ANIMALS = ['🌳','🌲','🌵','🌸','🌼','🌷','🌻','🍄','🪷','🌾','🍃','🌿','🌙','☘️','🌴','🌧️'];
       const PAIRS_PER_ROUND = 6;
       const CONFETTI_COLORS = ['#9dd9a8', '#4a9d5c', '#fbbf24', '#f472b6', '#a78bfa', '#34d399', '#f87171', '#fff'];
       const CONFETTI_SHAPES = ['rect', 'circle', 'star'];
+      const CHEST_CLAIM_LIFT_MS = 600;
+      const CHEST_CLAIM_FX_MS = 500;
 
       function detectLocale() {
         const params = new URLSearchParams(window.location.search);
@@ -153,8 +200,12 @@
       const previewBanner = document.getElementById('preview-banner');
       const previewBannerTitleEl = document.getElementById('preview-banner-title');
       const finishScore = document.getElementById('finish-score');
+      const finishResults = document.getElementById('finish-results');
       const hoorayEl = document.getElementById('hooray');
       const confettiContainer = document.getElementById('celebration-confetti');
+      const finishFx = document.getElementById('finish-fx');
+      const chestCoinBurst = document.getElementById('chest-coin-burst');
+      const CHEST_BURST_COIN_COUNT = 16;
 
       function applyStaticCopy() {
         document.title = t('meta.title');
@@ -167,20 +218,10 @@
         cardsGrid.setAttribute('aria-label', t('game.cardsGridAriaLabel'));
         document.getElementById('finish-title').textContent = t('finish.title');
         document.getElementById('finish-score-label').textContent = t('finish.scoreLabel');
-        btnRepeat.textContent = t('finish.buttonEndTraining');
+        btnRepeat.textContent = t('finish.buttonClaimReward');
       }
 
       applyStaticCopy();
-
-      window.TMA_LOADING.run({
-        title: t('meta.title'),
-        status: t('loading.status'),
-        icon: '✦',
-        emulateMs: LOADING_EMULATE_MS,
-        onReady: function () {
-          showScreen(screenStart);
-        },
-      });
 
       function playCelebration() {
         const phrases = tArray('game.celebrationPhrases');
@@ -225,6 +266,193 @@
           confettiContainer.appendChild(spark);
         }
         setTimeout(() => { confettiContainer.innerHTML = ''; }, 2500);
+      }
+
+      function clearChestBurstCoins() {
+        if (!chestCoinBurst) return;
+        chestCoinBurst.innerHTML = '';
+      }
+
+      function spawnChestBurstCoins() {
+        if (!chestCoinBurst) return;
+        clearChestBurstCoins();
+        const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        const count = reducedMotion ? 6 : CHEST_BURST_COIN_COUNT;
+        const fragment = document.createDocumentFragment();
+        for (let i = 0; i < count; i++) {
+          const coin = document.createElement('span');
+          coin.className = 'chest-burst-coin';
+          const angle = -Math.PI / 2 + (Math.random() - 0.5) * 1.5;
+          const dist = 80 + Math.random() * 150;
+          const fx = Math.cos(angle) * dist;
+          const fy = Math.sin(angle) * dist;
+          coin.style.setProperty('--fly-x', fx + 'px');
+          coin.style.setProperty('--fly-y', fy + 'px');
+          coin.style.setProperty('--spin', (Math.random() * 600 - 300) + 'deg');
+          const size = 14 + Math.random() * 14;
+          coin.style.width = size + 'px';
+          coin.style.height = Math.max(8, size * 0.52) + 'px';
+          coin.style.marginLeft = (-size / 2) + 'px';
+          coin.style.marginTop = (-size * 0.26) + 'px';
+          coin.style.animationDelay = (Math.random() * 0.22) + 's';
+          coin.style.animationDuration = (0.95 + Math.random() * 0.55) + 's';
+          fragment.appendChild(coin);
+        }
+        chestCoinBurst.appendChild(fragment);
+        setTimeout(clearChestBurstCoins, 2200);
+      }
+
+      let finishConfettiRainId = null;
+      let finishConfettiRainLast = 0;
+      let finishConfettiCount = 0;
+      const MAX_FINISH_CONFETTI = 140;
+      const FINISH_CONFETTI_RAIN_MS = 180;
+
+      function stopFinishConfettiRain() {
+        if (finishConfettiRainId) {
+          cancelAnimationFrame(finishConfettiRainId);
+          finishConfettiRainId = null;
+        }
+      }
+
+      function trimFinishConfetti() {
+        if (!finishFx || finishConfettiCount <= MAX_FINISH_CONFETTI) return;
+        const removeCount = finishConfettiCount - MAX_FINISH_CONFETTI;
+        const pieces = finishFx.querySelectorAll('.finish-confetti-piece');
+        for (let i = 0; i < removeCount && i < pieces.length; i++) {
+          pieces[i].remove();
+          finishConfettiCount -= 1;
+        }
+      }
+
+      function appendFinishConfettiPiece(piece) {
+        if (!finishFx) return;
+        finishFx.appendChild(piece);
+        finishConfettiCount += 1;
+        trimFinishConfetti();
+      }
+
+      function clearFinishConfetti() {
+        stopFinishConfettiRain();
+        if (!finishFx) return;
+        finishFx.querySelectorAll('.finish-confetti-piece').forEach(function (el) {
+          el.remove();
+        });
+        finishConfettiCount = 0;
+      }
+
+      function burstDistToEdge(angle) {
+        const originX = window.innerWidth * 0.5;
+        const originY = window.innerHeight * 0.42;
+        const cos = Math.cos(angle);
+        const sin = Math.sin(angle);
+        let t = Infinity;
+        if (cos > 0.001) t = Math.min(t, (window.innerWidth - originX) / cos);
+        if (cos < -0.001) t = Math.min(t, originX / -cos);
+        if (sin > 0.001) t = Math.min(t, (window.innerHeight - originY) / sin);
+        if (sin < -0.001) t = Math.min(t, originY / -sin);
+        if (!isFinite(t) || t <= 0) t = 220;
+        return t * (0.82 + Math.random() * 0.16);
+      }
+
+      function randomScreenScatterOffset() {
+        const vw = window.innerWidth;
+        const vh = window.innerHeight;
+        const targetX = vw * (0.04 + Math.random() * 0.92);
+        const targetY = vh * (0.04 + Math.random() * 0.9);
+        return {
+          x: targetX - vw * 0.5,
+          y: targetY - vh * 0.42,
+        };
+      }
+
+      function createBurstConfettiPiece() {
+        const piece = document.createElement('span');
+        const shape = CONFETTI_SHAPES[Math.floor(Math.random() * CONFETTI_SHAPES.length)];
+        piece.className = 'finish-confetti-piece ' + shape;
+        piece.style.background = CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)];
+        piece.style.left = '50%';
+        piece.style.top = '42%';
+        const roll = Math.random();
+        let bx;
+        let by;
+        if (roll < 0.22) {
+          const angle = Math.random() * Math.PI * 2;
+          const dist = burstDistToEdge(angle);
+          bx = Math.cos(angle) * dist;
+          by = Math.sin(angle) * dist;
+        } else if (roll < 0.5) {
+          const angle = Math.random() * Math.PI * 2;
+          const dist = 70 + Math.random() * 200;
+          bx = Math.cos(angle) * dist;
+          by = Math.sin(angle) * dist * 0.8;
+        } else {
+          const scatter = randomScreenScatterOffset();
+          bx = scatter.x;
+          by = scatter.y;
+        }
+        piece.style.setProperty('--burst-x', bx + 'px');
+        piece.style.setProperty('--burst-y', by + 'px');
+        piece.style.setProperty('--spin', (Math.random() * 900 - 450) + 'deg');
+        piece.style.setProperty('--burst-dur', (0.45 + Math.random() * 0.4) + 's');
+        piece.style.setProperty('--fall-dur', (2.2 + Math.random() * 2.4) + 's');
+        piece.style.setProperty('--burst-delay', (Math.random() * 0.1) + 's');
+        const size = 6 + Math.random() * 9;
+        piece.style.width = size + 'px';
+        piece.style.height = (shape === 'rect' ? size * 1.35 : size) + 'px';
+        return piece;
+      }
+
+      function spawnRainConfettiPiece() {
+        const piece = document.createElement('span');
+        const shape = CONFETTI_SHAPES[Math.floor(Math.random() * CONFETTI_SHAPES.length)];
+        piece.className = 'finish-confetti-piece finish-confetti-piece--rain ' + shape;
+        piece.style.background = CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)];
+        piece.style.left = (3 + Math.random() * 94) + '%';
+        piece.style.top = (-4 + Math.random() * 8) + '%';
+        piece.style.setProperty('--spin', (Math.random() * 720 - 360) + 'deg');
+        piece.style.setProperty('--drift-x', (Math.random() * 50 - 25) + 'px');
+        piece.style.setProperty('--fall-dur', (2.4 + Math.random() * 2.8) + 's');
+        piece.style.setProperty('--rain-delay', (Math.random() * 0.4) + 's');
+        const size = 5 + Math.random() * 8;
+        piece.style.width = size + 'px';
+        piece.style.height = (shape === 'rect' ? size * 1.3 : size) + 'px';
+        return piece;
+      }
+
+      function finishConfettiRainTick(now) {
+        if (!finishConfettiRainId) return;
+        if (!screenFinish.classList.contains('active') || document.hidden) {
+          stopFinishConfettiRain();
+          return;
+        }
+        if (now - finishConfettiRainLast >= FINISH_CONFETTI_RAIN_MS) {
+          finishConfettiRainLast = now;
+          appendFinishConfettiPiece(spawnRainConfettiPiece());
+          if (Math.random() > 0.5) appendFinishConfettiPiece(spawnRainConfettiPiece());
+        }
+        finishConfettiRainId = requestAnimationFrame(finishConfettiRainTick);
+      }
+
+      function startFinishConfettiRain() {
+        stopFinishConfettiRain();
+        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+        finishConfettiRainLast = 0;
+        finishConfettiRainId = requestAnimationFrame(finishConfettiRainTick);
+      }
+
+      function spawnFinishConfetti() {
+        if (!finishFx) return;
+        clearFinishConfetti();
+        const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        const count = reducedMotion ? 20 : 48;
+        const fragment = document.createDocumentFragment();
+        for (let i = 0; i < count; i++) {
+          fragment.appendChild(createBurstConfettiPiece());
+        }
+        finishFx.appendChild(fragment);
+        finishConfettiCount = count;
+        startFinishConfettiRain();
       }
 
       let timerId = null;
@@ -290,10 +518,59 @@
         timerId = setInterval(tick, TICK_MS);
       }
 
+      let claimTimeoutId = null;
+      let claimLidEl = null;
+      let claimNavDone = false;
+
+      function clearClaimRewardHandlers() {
+        if (claimTimeoutId) {
+          clearTimeout(claimTimeoutId);
+          claimTimeoutId = null;
+        }
+        if (claimLidEl) {
+          claimLidEl.removeEventListener('animationend', onChestClaimAnimationEnd);
+          claimLidEl = null;
+        }
+      }
+
+      function completeClaimReward() {
+        if (claimNavDone) return;
+        claimNavDone = true;
+        clearClaimRewardHandlers();
+        showScreen(screenStart);
+      }
+
+      function onChestClaimAnimationEnd(e) {
+        if (!claimLidEl || e.target !== claimLidEl) return;
+        if (e.animationName !== 'chest-lid-claim-lift') return;
+        if (claimTimeoutId) {
+          clearTimeout(claimTimeoutId);
+          claimTimeoutId = null;
+        }
+        claimTimeoutId = setTimeout(completeClaimReward, CHEST_CLAIM_FX_MS);
+      }
+
       function showScreen(screen) {
-        [screenStart, screenGame, screenFinish].forEach(s => s.classList.remove('active'));
+        claimNavDone = false;
+        screenStart.classList.remove('active');
+        screenGame.classList.remove('active');
+        screenFinish.classList.remove('active', 'finish-play', 'finish-claiming');
+        document.body.classList.remove('finish-active');
+        clearClaimRewardHandlers();
+        btnRepeat.disabled = false;
+
+        if (screen === screenFinish) {
+          document.body.classList.add('finish-active');
+          screenFinish.classList.add('active');
+          void screenFinish.offsetWidth;
+          screenFinish.classList.add('finish-play');
+          spawnFinishConfetti();
+          return;
+        }
+
+        clearFinishConfetti();
+        clearChestBurstCoins();
         screen.classList.add('active');
-        document.body.classList.toggle('finish-active', screen === screenFinish);
       }
 
       function shuffle(array) {
@@ -471,12 +748,66 @@
         isPreviewPhase = false;
         isBoardLocked = false;
         cardsGrid.classList.remove('cards-grid--preview');
-        showScreen(screenFinish);
         finishScore.textContent = correctCount;
+        showScreen(screenFinish);
       }
 
+      window.endGame = function (score) {
+        if (score != null) correctCount = Number(score) || 0;
+        endGame();
+      };
+
       btnStart.addEventListener('click', startGame);
-      btnRepeat.addEventListener('click', () => { showScreen(screenStart); });
+      btnRepeat.addEventListener('click', function () {
+        if (!screenFinish.classList.contains('active')) return;
+        if (screenFinish.classList.contains('finish-claiming')) return;
+        screenFinish.classList.add('finish-claiming');
+        btnRepeat.disabled = true;
+        spawnChestBurstCoins();
+
+        claimLidEl = screenFinish.querySelector('.chest-lid');
+        const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (!claimLidEl || reducedMotion) {
+          claimTimeoutId = setTimeout(completeClaimReward, reducedMotion ? 80 : 0);
+          return;
+        }
+
+        claimLidEl.addEventListener('animationend', onChestClaimAnimationEnd);
+        claimTimeoutId = setTimeout(
+          completeClaimReward,
+          CHEST_CLAIM_LIFT_MS + CHEST_CLAIM_FX_MS + 120
+        );
+      });
+
+      function boot() {
+        document.addEventListener('visibilitychange', function () {
+          if (document.hidden) {
+            stopFinishConfettiRain();
+            return;
+          }
+          if (screenFinish.classList.contains('active')) startFinishConfettiRain();
+        });
+
+        if (urlParams.get('end') === '1') {
+          finishScore.textContent = '3';
+          showScreen(screenFinish);
+          return;
+        }
+        showScreen(screenStart);
+      }
+
+      if (window.TMA_LOADING && typeof window.TMA_LOADING.run === 'function') {
+        const skipLoadingDelay = urlParams.get('end') === '1';
+        window.TMA_LOADING.run({
+          title: t('meta.title'),
+          status: t('loading.status'),
+          icon: '✦',
+          emulateMs: skipLoadingDelay ? 0 : LOADING_EMULATE_MS,
+          onReady: boot,
+        });
+      } else {
+        boot();
+      }
     })();
   </script>
 </body>
