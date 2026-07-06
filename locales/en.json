@@ -36,6 +36,69 @@
   "finish": {
     "title": "Game over",
     "scoreLabel": "pairs cleared",
+    "tokensLabel": "tokens for this training",
     "buttonClaimReward": "Claim reward"
+  },
+  "share": {
+    "metaTitle": "Invite friends",
+    "title": "Challenge your friends",
+    "lead": "Send your personal link and see who finds more pairs in 60 seconds.",
+    "benefits": [
+      {
+        "icon": "🧠",
+        "title": "Train together",
+        "text": "A quick memory workout you can play during a chat break."
+      },
+      {
+        "icon": "🏆",
+        "title": "Compare scores",
+        "text": "Find out who clears more pairs before the timer runs out."
+      },
+      {
+        "icon": "⚡",
+        "title": "One tap to start",
+        "text": "Friends open your link and jump straight into the game."
+      }
+    ],
+    "yourLink": "Your referral link",
+    "copyLink": "Copy link",
+    "copied": "Copied",
+    "shareTelegram": "Send in Telegram",
+    "shareNative": "Share",
+    "backToGame": "Back to game",
+    "shareText": "Let's play Memory pairs — can you beat my score?",
+    "toastCopyFailed": "Could not copy. Select the link and copy manually."
+  },
+  "profile": {
+    "metaTitle": "Profile",
+    "subtitle": "Your training progress",
+    "guestName": "Player",
+    "totalTokens": "Total tokens",
+    "weekSummary": "{sessions} sessions this week · +{tokens} tokens",
+    "tokenTypesTitle": "Token types",
+    "weekTitle": "Training this week",
+    "weekEmpty": "No training sessions this week yet. Play a game and claim your reward.",
+    "lastTrainTokens": "Last train: {tokens} · {date}",
+    "noTrainThisWeek": "No training this week",
+    "backToGame": "Back to game",
+    "inviteFriends": "Invite friends",
+    "openProfile": "Profile",
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "tokenTypes": {
+      "memory": "Memory",
+      "logic": "Logic",
+      "spatial": "Spatial",
+      "analysis": "Analysis",
+      "focus": "Focus"
+    },
+    "games": {
+      "pairs": "Memory pairs",
+      "sum": "Number sum",
+      "shapes": "Shapes",
+      "average": "Average",
+      "equi": "Balance",
+      "change": "Change"
+    }
   }
 }

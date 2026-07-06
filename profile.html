@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Profile</title>
+  <link rel="stylesheet" href="../tma-shared/tma-theme.css" />
+  <link rel="stylesheet" href="game.css" />
+  <link rel="stylesheet" href="profile.css" />
+  <script src="https://telegram.org/js/telegram-web-app.js" defer></script>
+</head>
+<body>
+  <main class="profile-page">
+    <div class="profile-shell">
+      <header class="profile-hero">
+        <div class="profile-avatar" id="profile-avatar" aria-hidden="true">?</div>
+        <h1 class="profile-title" id="profile-title"></h1>
+        <p class="profile-subtitle" id="profile-subtitle"></p>
+      </header>
+
+      <section class="profile-summary" aria-labelledby="profile-summary-label">
+        <span class="profile-summary-label" id="profile-summary-label"></span>
+        <div class="profile-summary-total" id="profile-total-tokens">0</div>
+        <p class="profile-summary-meta" id="profile-week-meta"></p>
+      </section>
+
+      <section aria-labelledby="profile-types-title">
+        <h2 class="profile-section-title" id="profile-types-title"></h2>
+        <div class="profile-token-grid" id="profile-token-grid"></div>
+      </section>
+
+      <section aria-labelledby="profile-week-title">
+        <h2 class="profile-section-title" id="profile-week-title"></h2>
+        <div class="profile-week-list" id="profile-week-list"></div>
+      </section>
+
+      <div class="profile-actions">
+        <a class="profile-btn profile-btn-primary" id="btn-play" href="index.html"></a>
+        <a class="profile-btn profile-btn-ghost" id="btn-share" href="share.html"></a>
+      </div>
+    </div>
+  </main>
+
+  <script src="locales/messages.js"></script>
+  <script src="../tma-shared/tma-profile-store.js"></script>
+  <script>
+    (function () {
+      const SUPPORTED_LOCALES = ['ru', 'en'];
+      const DEFAULT_LOCALE = 'en';
+      const urlParams = new URLSearchParams(window.location.search);
+
+      function detectLocale() {
+        const fromQuery = urlParams.get('lang');
+        if (fromQuery) {
+          const base = fromQuery.toLowerCase().split('-')[0];
+          if (SUPPORTED_LOCALES.includes(base)) return base;
+        }
+        const candidates = navigator.languages && navigator.languages.length
+          ? navigator.languages
+          : [navigator.language];
+        for (let i = 0; i < candidates.length; i++) {
+          const tag = candidates[i];
+          if (!tag) continue;
+          const lower = tag.toLowerCase();
+          const base = lower.split('-')[0];
+          if (SUPPORTED_LOCALES.includes(lower)) return lower;
+          if (SUPPORTED_LOCALES.includes(base)) return base;
+        }
+        return DEFAULT_LOCALE;
+      }
+
+      function resolveMessages(locale) {
+        const bundle = window.TMA_I18N;
+        if (!bundle || typeof bundle !== 'object') return {};
+        const chosen = bundle[locale] || bundle[DEFAULT_LOCALE];
+        if (chosen && typeof chosen === 'object') return chosen;
+        return bundle[DEFAULT_LOCALE] && typeof bundle[DEFAULT_LOCALE] === 'object'
+          ? bundle[DEFAULT_LOCALE]
+          : {};
+      }
+
+      const activeLocale = detectLocale();
+      const messages = resolveMessages(activeLocale);
+      document.documentElement.lang = activeLocale === 'ru' ? 'ru' : 'en';
+
+      function t(key) {
+        const parts = key.split('.');
+        let cur = messages;
+        for (let i = 0; i < parts.length; i++) {
+          if (cur == null || typeof cur !== 'object') return key;
+          cur = cur[parts[i]];
+        }
+        if (typeof cur === 'string' || typeof cur === 'number') return String(cur);
+        return key;
+      }
+
+      function formatNumber(value) {
+        const n = Math.max(0, Math.round(Number(value) || 0));
+        if (activeLocale === 'ru') {
+          return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+        }
+        return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+      }
+
+      function formatSessionDate(iso) {
+        const date = new Date(iso);
+        if (isNaN(date.getTime())) return '—';
+        if (activeLocale === 'ru') {
+          const now = new Date();
+          const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+          const dayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+          const hours = String(date.getHours()).padStart(2, '0');
+          const minutes = String(date.getMinutes()).padStart(2, '0');
+          if (dayStart === todayStart) return t('profile.today') + ', ' + hours + ':' + minutes;
+          if (dayStart === todayStart - 86400000) return t('profile.yesterday') + ', ' + hours + ':' + minutes;
+          const months = ['янв.', 'февр.', 'мар.', 'апр.', 'мая', 'июн.', 'июл.', 'авг.', 'сент.', 'окт.', 'нояб.', 'дек.'];
+          return date.getDate() + ' ' + months[date.getMonth()] + ', ' + hours + ':' + minutes;
+        }
+        const now = new Date();
+        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+        const dayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        if (dayStart === todayStart) return 'Today, ' + hours + ':' + minutes;
+        if (dayStart === todayStart - 86400000) return 'Yesterday, ' + hours + ':' + minutes;
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        return months[date.getMonth()] + ' ' + date.getDate() + ', ' + hours + ':' + minutes;
+      }
+
+      function getDisplayName() {
+        try {
+          const tg = window.Telegram && window.Telegram.WebApp;
+          const user = tg && tg.initDataUnsafe && tg.initDataUnsafe.user;
+          if (user) {
+            const full = [user.first_name, user.last_name].filter(Boolean).join(' ').trim();
+            if (full) return full;
+            if (user.username) return '@' + user.username;
+          }
+        } catch (_) {}
+        return t('profile.guestName');
+      }
+
+      function getAvatarLetter(name) {
+        const ch = (name || '?').trim().charAt(0);
+        return ch ? ch.toUpperCase() : '?';
+      }
+
+      const TOKEN_ICON_SRC = {
+        memory: 'assets/images/gamebar-image-memory.png',
+        logic: 'assets/images/gamebar-image-calc.png',
+        spatial: 'assets/images/gamebar-image-attention.png',
+        analysis: 'assets/images/gamebar-image-fastmem.png',
+        focus: 'assets/images/gamebar-image-reaction.png',
+      };
+
+      function tokenTypeMeta(type) {
+        return {
+          memory: { iconSrc: TOKEN_ICON_SRC.memory, label: t('profile.tokenTypes.memory') },
+          logic: { iconSrc: TOKEN_ICON_SRC.logic, label: t('profile.tokenTypes.logic') },
+          spatial: { iconSrc: TOKEN_ICON_SRC.spatial, label: t('profile.tokenTypes.spatial') },
+          analysis: { iconSrc: TOKEN_ICON_SRC.analysis, label: t('profile.tokenTypes.analysis') },
+          focus: { iconSrc: TOKEN_ICON_SRC.focus, label: t('profile.tokenTypes.focus') },
+        }[type] || { iconSrc: TOKEN_ICON_SRC.memory, label: type };
+      }
+
+      function gameLabel(gameId) {
+        const key = 'profile.games.' + gameId;
+        const label = t(key);
+        return label === key ? gameId : label;
+      }
+
+      function renderTokenGrid(totals, lastByType) {
+        const grid = document.getElementById('profile-token-grid');
+        grid.innerHTML = '';
+        const types = window.TMA_PROFILE_STORE.TOKEN_TYPES;
+        types.forEach(function (type) {
+          const meta = tokenTypeMeta(type);
+          const card = document.createElement('article');
+          card.className = 'profile-token-card';
+          const last = lastByType[type];
+          const lastHtml = last
+            ? t('profile.lastTrainTokens')
+                .replace('{tokens}', '<strong>+' + formatNumber(last.tokens) + '</strong>')
+                .replace('{date}', formatSessionDate(last.endedAt))
+            : t('profile.noTrainThisWeek');
+          card.innerHTML =
+            '<div class="profile-token-head">' +
+              '<span class="profile-token-icon profile-token-icon--' + type + '" aria-hidden="true">' +
+                '<img class="profile-token-icon-img" src="' + meta.iconSrc + '" alt="" width="36" height="36" />' +
+              '</span>' +
+              '<span class="profile-token-name">' + meta.label + '</span>' +
+            '</div>' +
+            '<div class="profile-token-total">' + formatNumber(totals.byType[type] || 0) + '</div>' +
+            '<div class="profile-token-last">' + lastHtml + '</div>';
+          grid.appendChild(card);
+        });
+      }
+
+      function renderWeekSessions(sessions) {
+        const list = document.getElementById('profile-week-list');
+        list.innerHTML = '';
+        if (!sessions.length) {
+          const empty = document.createElement('p');
+          empty.className = 'profile-empty';
+          empty.textContent = t('profile.weekEmpty');
+          list.appendChild(empty);
+          return;
+        }
+        sessions.slice(0, 12).forEach(function (session) {
+          const item = document.createElement('div');
+          item.className = 'profile-week-item';
+          item.innerHTML =
+            '<div class="profile-week-main">' +
+              '<span class="profile-week-game">' + gameLabel(session.gameId) + '</span>' +
+              '<span class="profile-week-date">' + formatSessionDate(session.endedAt) + '</span>' +
+            '</div>' +
+            '<span class="profile-week-tokens">+' + formatNumber(session.tokens) + '</span>';
+          list.appendChild(item);
+        });
+      }
+
+      function renderProfile() {
+        const storeApi = window.TMA_PROFILE_STORE;
+        if (!storeApi) return;
+
+        if (urlParams.get('demo') === '1') {
+          storeApi.seedDemoData();
+        }
+
+        const totals = storeApi.getTotals();
+        const weekSessions = storeApi.getWeekSessions();
+        const lastByType = storeApi.getLastSessionPerTypeForWeek();
+        const weekTokens = weekSessions.reduce(function (sum, s) {
+          return sum + (s.tokens || 0);
+        }, 0);
+
+        const displayName = getDisplayName();
+        document.title = t('profile.metaTitle');
+        document.getElementById('profile-avatar').textContent = getAvatarLetter(displayName);
+        document.getElementById('profile-title').textContent = displayName;
+        document.getElementById('profile-subtitle').textContent = t('profile.subtitle');
+        document.getElementById('profile-summary-label').textContent = t('profile.totalTokens');
+        document.getElementById('profile-total-tokens').textContent = formatNumber(totals.total);
+        document.getElementById('profile-week-meta').textContent = t('profile.weekSummary')
+          .replace('{sessions}', formatNumber(weekSessions.length))
+          .replace('{tokens}', formatNumber(weekTokens));
+        document.getElementById('profile-types-title').textContent = t('profile.tokenTypesTitle');
+        document.getElementById('profile-week-title').textContent = t('profile.weekTitle');
+        document.getElementById('btn-play').textContent = t('profile.backToGame');
+        document.getElementById('btn-share').textContent = t('profile.inviteFriends');
+
+        renderTokenGrid(totals, lastByType);
+        renderWeekSessions(weekSessions);
+      }
+
+      renderProfile();
+    })();
+  </script>
+</body>
+</html>

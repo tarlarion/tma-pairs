@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Invite friends</title>
+  <link rel="stylesheet" href="../tma-shared/tma-theme.css" />
+  <link rel="stylesheet" href="game.css" />
+  <link rel="stylesheet" href="share.css" />
+  <script src="https://telegram.org/js/telegram-web-app.js" defer></script>
+</head>
+<body>
+  <main class="share-page">
+    <div class="share-shell">
+      <header class="share-hero">
+        <div class="share-hero-icon" aria-hidden="true">🤝</div>
+        <h1 class="share-title" id="share-title"></h1>
+        <p class="share-lead" id="share-lead"></p>
+      </header>
+
+      <ul class="share-benefits" id="share-benefits" aria-label=""></ul>
+
+      <section class="share-link-card" aria-labelledby="share-link-label">
+        <span class="share-link-label" id="share-link-label"></span>
+        <div class="share-link-field">
+          <input
+            class="share-link-input"
+            id="share-link-input"
+            type="text"
+            readonly
+            inputmode="url"
+            autocomplete="off"
+            spellcheck="false"
+            aria-readonly="true"
+          />
+        </div>
+      </section>
+
+      <div class="share-actions">
+        <button type="button" class="share-btn share-btn-primary" id="btn-share-telegram">
+          <span class="share-btn-icon" aria-hidden="true">✈️</span>
+          <span id="btn-share-telegram-label"></span>
+        </button>
+        <div class="share-actions-row">
+          <button type="button" class="share-btn share-btn-secondary" id="btn-copy-link">
+            <span class="share-btn-icon" aria-hidden="true">🔗</span>
+            <span id="btn-copy-link-label"></span>
+          </button>
+          <button type="button" class="share-btn share-btn-secondary" id="btn-share-native" hidden>
+            <span class="share-btn-icon" aria-hidden="true">📤</span>
+            <span id="btn-share-native-label"></span>
+          </button>
+        </div>
+        <a class="share-btn share-btn-ghost" id="btn-back" href="index.html"></a>
+      </div>
+    </div>
+  </main>
+
+  <div class="share-toast" id="share-toast" role="status" aria-live="polite"></div>
+
+  <script src="locales/messages.js"></script>
+  <script>
+    (function () {
+      const SUPPORTED_LOCALES = ['ru', 'en'];
+      const DEFAULT_LOCALE = 'en';
+      const REF_STORAGE_KEY = 'tma_pairs_ref_id';
+
+      function detectLocale() {
+        const params = new URLSearchParams(window.location.search);
+        const fromQuery = params.get('lang');
+        if (fromQuery) {
+          const base = fromQuery.toLowerCase().split('-')[0];
+          if (SUPPORTED_LOCALES.includes(base)) return base;
+        }
+        const candidates = navigator.languages && navigator.languages.length
+          ? navigator.languages
+          : [navigator.language];
+        for (let i = 0; i < candidates.length; i++) {
+          const tag = candidates[i];
+          if (!tag) continue;
+          const lower = tag.toLowerCase();
+          const base = lower.split('-')[0];
+          if (SUPPORTED_LOCALES.includes(lower)) return lower;
+          if (SUPPORTED_LOCALES.includes(base)) return base;
+        }
+        return DEFAULT_LOCALE;
+      }
+
+      function resolveMessages(locale) {
+        const bundle = window.TMA_I18N;
+        if (!bundle || typeof bundle !== 'object') return {};
+        const chosen = bundle[locale] || bundle[DEFAULT_LOCALE];
+        if (chosen && typeof chosen === 'object') return chosen;
+        return bundle[DEFAULT_LOCALE] && typeof bundle[DEFAULT_LOCALE] === 'object'
+          ? bundle[DEFAULT_LOCALE]
+          : {};
+      }
+
+      let messages = {};
+      const activeLocale = detectLocale();
+      messages = resolveMessages(activeLocale);
+      document.documentElement.lang = activeLocale === 'ru' ? 'ru' : 'en';
+
+      function t(key) {
+        const parts = key.split('.');
+        let cur = messages;
+        for (let i = 0; i < parts.length; i++) {
+          if (cur == null || typeof cur !== 'object') return key;
+          cur = cur[parts[i]];
+        }
+        if (typeof cur === 'string' || typeof cur === 'number') return String(cur);
+        return key;
+      }
+
+      function getBenefits() {
+        const list = messages.share && messages.share.benefits;
+        return Array.isArray(list) ? list : [];
+      }
+
+      function getReferralId() {
+        const params = new URLSearchParams(window.location.search);
+        const fromUrl = params.get('ref');
+        if (fromUrl) return fromUrl;
+
+        const tg = window.Telegram && window.Telegram.WebApp;
+        const tgUserId = tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id;
+        if (tgUserId) return String(tgUserId);
+
+        try {
+          const stored = localStorage.getItem(REF_STORAGE_KEY);
+          if (stored) return stored;
+          const generated = 'u' + Math.random().toString(36).slice(2, 11);
+          localStorage.setItem(REF_STORAGE_KEY, generated);
+          return generated;
+        } catch (error) {
+          return 'guest' + Date.now().toString(36);
+        }
+      }
+
+      function buildReferralUrl(refId) {
+        const url = new URL('index.html', window.location.href);
+        url.searchParams.set('ref', refId);
+        if (activeLocale !== DEFAULT_LOCALE) {
+          url.searchParams.set('lang', activeLocale);
+        }
+        return url.toString();
+      }
+
+      const referralId = getReferralId();
+      const referralUrl = buildReferralUrl(referralId);
+      const shareText = t('share.shareText');
+
+      const shareTitle = document.getElementById('share-title');
+      const shareLead = document.getElementById('share-lead');
+      const shareBenefits = document.getElementById('share-benefits');
+      const shareLinkLabel = document.getElementById('share-link-label');
+      const shareLinkInput = document.getElementById('share-link-input');
+      const btnShareTelegram = document.getElementById('btn-share-telegram');
+      const btnShareTelegramLabel = document.getElementById('btn-share-telegram-label');
+      const btnCopyLink = document.getElementById('btn-copy-link');
+      const btnCopyLinkLabel = document.getElementById('btn-copy-link-label');
+      const btnShareNative = document.getElementById('btn-share-native');
+      const btnShareNativeLabel = document.getElementById('btn-share-native-label');
+      const btnBack = document.getElementById('btn-back');
+      const shareToast = document.getElementById('share-toast');
+
+      let toastTimeoutId = null;
+      let copyResetTimeoutId = null;
+
+      document.title = t('share.metaTitle');
+      shareTitle.textContent = t('share.title');
+      shareLead.textContent = t('share.lead');
+      shareLinkLabel.textContent = t('share.yourLink');
+      shareLinkInput.value = referralUrl;
+      btnShareTelegramLabel.textContent = t('share.shareTelegram');
+      btnCopyLinkLabel.textContent = t('share.copyLink');
+      btnShareNativeLabel.textContent = t('share.shareNative');
+      btnBack.textContent = t('share.backToGame');
+
+      if (activeLocale !== DEFAULT_LOCALE) {
+        btnBack.href = 'index.html?lang=' + encodeURIComponent(activeLocale);
+      }
+
+      shareBenefits.setAttribute('aria-label', t('share.title'));
+      getBenefits().forEach(function (benefit) {
+        const item = document.createElement('li');
+        item.className = 'share-benefit';
+
+        const icon = document.createElement('span');
+        icon.className = 'share-benefit-icon';
+        icon.setAttribute('aria-hidden', 'true');
+        icon.textContent = benefit.icon || '✦';
+
+        const body = document.createElement('div');
+        body.className = 'share-benefit-body';
+
+        const title = document.createElement('strong');
+        title.className = 'share-benefit-title';
+        title.textContent = benefit.title || '';
+
+        const text = document.createElement('p');
+        text.className = 'share-benefit-text';
+        text.textContent = benefit.text || '';
+
+        body.appendChild(title);
+        body.appendChild(text);
+        item.appendChild(icon);
+        item.appendChild(body);
+        shareBenefits.appendChild(item);
+      });
+
+      if (navigator.share) {
+        btnShareNative.hidden = false;
+      }
+
+      function showToast(message) {
+        shareToast.textContent = message;
+        shareToast.classList.add('is-visible');
+        if (toastTimeoutId) clearTimeout(toastTimeoutId);
+        toastTimeoutId = setTimeout(function () {
+          shareToast.classList.remove('is-visible');
+        }, 2400);
+      }
+
+      function copyReferralLink() {
+        function onCopied() {
+          btnCopyLink.classList.add('is-copied');
+          btnCopyLinkLabel.textContent = t('share.copied');
+          showToast(t('share.copied'));
+          if (copyResetTimeoutId) clearTimeout(copyResetTimeoutId);
+          copyResetTimeoutId = setTimeout(function () {
+            btnCopyLink.classList.remove('is-copied');
+            btnCopyLinkLabel.textContent = t('share.copyLink');
+          }, 2000);
+        }
+
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          return navigator.clipboard.writeText(referralUrl).then(onCopied).catch(fallbackCopy);
+        }
+        return fallbackCopy();
+
+        function fallbackCopy() {
+          shareLinkInput.focus();
+          shareLinkInput.select();
+          shareLinkInput.setSelectionRange(0, referralUrl.length);
+          try {
+            const ok = document.execCommand('copy');
+            if (ok) {
+              onCopied();
+              return Promise.resolve();
+            }
+          } catch (error) {
+            /* ignore */
+          }
+          showToast(t('share.toastCopyFailed'));
+          return Promise.resolve();
+        }
+      }
+
+      function shareViaTelegram() {
+        const tg = window.Telegram && window.Telegram.WebApp;
+        const shareUrl = 'https://t.me/share/url?url=' + encodeURIComponent(referralUrl)
+          + '&text=' + encodeURIComponent(shareText);
+
+        if (tg && typeof tg.openTelegramLink === 'function') {
+          tg.openTelegramLink(shareUrl);
+          return;
+        }
+        window.open(shareUrl, '_blank', 'noopener,noreferrer');
+      }
+
+      function shareNative() {
+        if (!navigator.share) return;
+        navigator.share({
+          title: t('share.title'),
+          text: shareText,
+          url: referralUrl,
+        }).catch(function (error) {
+          if (error && error.name === 'AbortError') return;
+        });
+      }
+
+      btnCopyLink.addEventListener('click', function () {
+        copyReferralLink();
+      });
+
+      btnShareTelegram.addEventListener('click', function () {
+        shareViaTelegram();
+      });
+
+      btnShareNative.addEventListener('click', function () {
+        shareNative();
+      });
+
+      shareLinkInput.addEventListener('click', function () {
+        shareLinkInput.select();
+      });
+
+      if (window.Telegram && window.Telegram.WebApp) {
+        window.Telegram.WebApp.ready();
+        window.Telegram.WebApp.expand();
+      }
+    })();
+  </script>
+</body>
+</html>

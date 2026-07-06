@@ -56,10 +56,21 @@
     <!-- Финишный экран -->
     <div id="screen-finish" class="screen">
       <div class="finish-header">
-        <h2 class="finish-title" id="finish-title"></h2>
-        <div class="finish-score-block">
-          <div class="finish-score" id="finish-score">0</div>
-          <div class="finish-score-label" id="finish-score-label"></div>
+        <div class="finish-header-top">
+          <h2 class="finish-title" id="finish-title"></h2>
+          <div class="finish-score-block">
+            <div class="finish-score" id="finish-score">0</div>
+            <div class="finish-score-label" id="finish-score-label"></div>
+          </div>
+        </div>
+        <div class="finish-token-reward" id="finish-token-reward" aria-live="polite">
+          <div class="finish-token-badge">
+            <div class="finish-token-row">
+              <span class="finish-token-icon" aria-hidden="true"></span>
+              <span class="finish-token-count" id="finish-token-count">0</span>
+            </div>
+            <p class="finish-token-label" id="finish-token-label"></p>
+          </div>
         </div>
       </div>
       <div class="finish-chest-stage" id="finish-chest-stage" aria-hidden="true">
@@ -91,6 +102,9 @@
             <div class="chest-lid-inner"></div>
           </div>
           <div class="chest-coin-burst" id="chest-coin-burst" aria-hidden="true"></div>
+          <div class="chest-token-rise" id="chest-token-rise" aria-hidden="true">
+            <span class="finish-token-icon chest-token-icon"></span>
+          </div>
           <span class="chest-sparkle"></span>
           <span class="chest-sparkle"></span>
           <span class="chest-sparkle"></span>
@@ -110,6 +124,7 @@
   <!-- Locales: JSON sources are locales/en.json + locales/ru.json; run `node locales/build-messages.js` after editing them. -->
   <script src="locales/messages.js"></script>
   <script src="../tma-shared/tma-loading.js"></script>
+  <script src="../tma-shared/tma-profile-store.js"></script>
   <script>
     (function () {
       const SUPPORTED_LOCALES = ['ru', 'en'];
@@ -125,6 +140,10 @@
       const CONFETTI_SHAPES = ['rect', 'circle', 'star'];
       const CHEST_CLAIM_LIFT_MS = 600;
       const CHEST_CLAIM_FX_MS = 500;
+      const FINISH_READY_DELAY_MS = 1050;
+      const FINISH_TOKEN_COUNTUP_MS = 700;
+      const FINISH_TOKEN_REVEAL_DELAY_MS = 1850;
+      const TOKENS_PER_PAIR = 1;
 
       function detectLocale() {
         const params = new URLSearchParams(window.location.search);
@@ -200,6 +219,9 @@
       const previewBanner = document.getElementById('preview-banner');
       const previewBannerTitleEl = document.getElementById('preview-banner-title');
       const finishScore = document.getElementById('finish-score');
+      const finishTokenReward = document.getElementById('finish-token-reward');
+      const finishTokenCount = document.getElementById('finish-token-count');
+      const finishTokenLabel = document.getElementById('finish-token-label');
       const finishResults = document.getElementById('finish-results');
       const hoorayEl = document.getElementById('hooray');
       const confettiContainer = document.getElementById('celebration-confetti');
@@ -218,6 +240,11 @@
         cardsGrid.setAttribute('aria-label', t('game.cardsGridAriaLabel'));
         document.getElementById('finish-title').textContent = t('finish.title');
         document.getElementById('finish-score-label').textContent = t('finish.scoreLabel');
+        finishTokenLabel.textContent = t('finish.tokensLabel');
+        finishTokenReward.setAttribute(
+          'aria-label',
+          t('finish.tokensLabel')
+        );
         btnRepeat.textContent = t('finish.buttonClaimReward');
       }
 
@@ -459,6 +486,7 @@
       let previewTimeoutId = null;
       let gameStartTime = 0;
       let correctCount = 0;
+      let sessionStartedAt = null;
       let firstOpenIndex = null;
       let isBoardLocked = false;
       let isPreviewPhase = false;
@@ -521,6 +549,108 @@
       let claimTimeoutId = null;
       let claimLidEl = null;
       let claimNavDone = false;
+      let finishReadyTimeoutId = null;
+      let finishTokenCountupId = null;
+      let trainTokensEarned = 0;
+      let finishTokenCountupStarted = false;
+
+      function clearFinishReadyTimers() {
+        if (finishReadyTimeoutId) {
+          clearTimeout(finishReadyTimeoutId);
+          finishReadyTimeoutId = null;
+        }
+        if (finishTokenCountupId) {
+          cancelAnimationFrame(finishTokenCountupId);
+          finishTokenCountupId = null;
+        }
+      }
+
+      function calculateTrainTokens(pairsFound) {
+        const pairs = Math.max(0, Number(pairsFound) || 0);
+        return pairs * TOKENS_PER_PAIR;
+      }
+
+      function formatTokenCount(value) {
+        return String(Math.max(0, Math.round(value)));
+      }
+
+      function resetFinishTokenDisplay() {
+        finishTokenCount.textContent = '0';
+        finishTokenCount.dataset.value = '0';
+      }
+
+      function animateFinishTokenCount(target) {
+        if (finishTokenCountupId) {
+          cancelAnimationFrame(finishTokenCountupId);
+          finishTokenCountupId = null;
+        }
+        const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (reducedMotion || target <= 0) {
+          finishTokenCount.classList.remove('is-counting');
+          finishTokenCount.textContent = formatTokenCount(target);
+          finishTokenCount.dataset.value = String(target);
+          return;
+        }
+
+        finishTokenCount.classList.add('is-counting');
+        const startedAt = performance.now();
+        function tick(now) {
+          const progress = Math.min(1, (now - startedAt) / FINISH_TOKEN_COUNTUP_MS);
+          const eased = 1 - Math.pow(1 - progress, 3);
+          const current = Math.round(target * eased);
+          finishTokenCount.textContent = formatTokenCount(current);
+          if (progress < 1) {
+            finishTokenCountupId = requestAnimationFrame(tick);
+            return;
+          }
+          finishTokenCountupId = null;
+          finishTokenCount.classList.remove('is-counting');
+          finishTokenCount.textContent = formatTokenCount(target);
+          finishTokenCount.dataset.value = String(target);
+        }
+        finishTokenCountupId = requestAnimationFrame(tick);
+      }
+
+      function startFinishTokenCountup() {
+        if (finishTokenCountupStarted) return;
+        finishTokenCountupStarted = true;
+        animateFinishTokenCount(trainTokensEarned);
+      }
+
+      function onFinishTokenRevealStart(e) {
+        if (e.target !== finishTokenReward || e.animationName !== 'finish-token-slot-open') return;
+        startFinishTokenCountup();
+      }
+
+      function revealFinishReady() {
+        if (!screenFinish.classList.contains('active')) return;
+        if (screenFinish.classList.contains('finish-ready')) return;
+        finishTokenCountupStarted = false;
+        screenFinish.classList.add('finish-ready');
+        const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (reducedMotion) {
+          startFinishTokenCountup();
+          return;
+        }
+        finishTokenReward.addEventListener('animationstart', onFinishTokenRevealStart, { once: true });
+        setTimeout(function () {
+          finishTokenReward.removeEventListener('animationstart', onFinishTokenRevealStart);
+          startFinishTokenCountup();
+        }, FINISH_TOKEN_REVEAL_DELAY_MS + 1200);
+      }
+
+      function scheduleFinishReady() {
+        clearFinishReadyTimers();
+        const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (reducedMotion) {
+          revealFinishReady();
+          return;
+        }
+        finishReadyTimeoutId = setTimeout(function () {
+          finishReadyTimeoutId = null;
+          revealFinishReady();
+        }, FINISH_READY_DELAY_MS);
+      }
 
       function clearClaimRewardHandlers() {
         if (claimTimeoutId) {
@@ -533,9 +663,21 @@
         }
       }
 
+      function persistTrainingSession() {
+        if (!window.TMA_PROFILE_STORE || trainTokensEarned <= 0) return;
+        window.TMA_PROFILE_STORE.recordSession({
+          gameId: 'pairs',
+          score: correctCount,
+          tokens: trainTokensEarned,
+          startedAt: sessionStartedAt || new Date().toISOString(),
+          endedAt: new Date().toISOString(),
+        });
+      }
+
       function completeClaimReward() {
         if (claimNavDone) return;
         claimNavDone = true;
+        persistTrainingSession();
         clearClaimRewardHandlers();
         showScreen(screenStart);
       }
@@ -554,22 +696,28 @@
         claimNavDone = false;
         screenStart.classList.remove('active');
         screenGame.classList.remove('active');
-        screenFinish.classList.remove('active', 'finish-play', 'finish-claiming');
+        screenFinish.classList.remove('active', 'finish-play', 'finish-ready', 'finish-complete', 'finish-claiming');
         document.body.classList.remove('finish-active');
         clearClaimRewardHandlers();
+        clearFinishReadyTimers();
         btnRepeat.disabled = false;
 
         if (screen === screenFinish) {
           document.body.classList.add('finish-active');
+          resetFinishTokenDisplay();
+          finishTokenCountupStarted = false;
           screenFinish.classList.add('active');
           void screenFinish.offsetWidth;
           screenFinish.classList.add('finish-play');
           spawnFinishConfetti();
+          scheduleFinishReady();
           return;
         }
 
         clearFinishConfetti();
         clearChestBurstCoins();
+        resetFinishTokenDisplay();
+        trainTokensEarned = 0;
         screen.classList.add('active');
       }
 
@@ -727,6 +875,8 @@
           timerId = null;
         }
         correctCount = 0;
+        trainTokensEarned = 0;
+        sessionStartedAt = new Date().toISOString();
         scoreCountEl.textContent = correctCount;
         timerEl.textContent = TOTAL_SEC.toFixed(2);
         timerEl.classList.remove('warning');
@@ -749,6 +899,12 @@
         isBoardLocked = false;
         cardsGrid.classList.remove('cards-grid--preview');
         finishScore.textContent = correctCount;
+        trainTokensEarned = calculateTrainTokens(correctCount);
+        const tokensOverride = urlParams.get('tokens');
+        if (tokensOverride != null && tokensOverride !== '') {
+          trainTokensEarned = Math.max(0, Number(tokensOverride) || 0);
+        }
+        finishTokenCount.dataset.value = String(trainTokensEarned);
         showScreen(screenFinish);
       }
 
@@ -789,7 +945,14 @@
         });
 
         if (urlParams.get('end') === '1') {
+          correctCount = 3;
           finishScore.textContent = '3';
+          trainTokensEarned = calculateTrainTokens(correctCount);
+          const tokensOverride = urlParams.get('tokens');
+          if (tokensOverride != null && tokensOverride !== '') {
+            trainTokensEarned = Math.max(0, Number(tokensOverride) || 0);
+          }
+          finishTokenCount.dataset.value = String(trainTokensEarned);
           showScreen(screenFinish);
           return;
         }
