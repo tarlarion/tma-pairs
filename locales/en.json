@@ -35,8 +35,11 @@
   },
   "finish": {
     "title": "Game over",
+    "titleReward": "You earned",
     "scoreLabel": "pairs cleared",
     "tokensLabel": "tokens for this training",
+    "buttonShare": "Share with a friend",
+    "buttonContinue": "Continue",
     "buttonClaimReward": "Claim reward"
   },
   "share": {

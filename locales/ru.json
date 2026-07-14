@@ -35,8 +35,11 @@
   },
   "finish": {
     "title": "Игра окончена",
+    "titleReward": "Вы заработали",
     "scoreLabel": "отгадано пар",
     "tokensLabel": "токенов за тренировку",
+    "buttonShare": "Поделиться с другом",
+    "buttonContinue": "Продолжить",
     "buttonClaimReward": "Забрать награду"
   },
   "share": {

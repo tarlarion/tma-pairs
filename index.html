@@ -53,7 +53,7 @@
       <div class="cards-grid" id="cards-grid"></div>
     </div>
 
-    <!-- Финишный экран -->
+    <!-- Финишный экран: phase-score → Continue → phase-reward -->
     <div id="screen-finish" class="screen">
       <div class="finish-header">
         <div class="finish-header-top">
@@ -111,6 +111,12 @@
           <span class="chest-sparkle"></span>
           <span class="chest-sparkle"></span>
           <span class="chest-sparkle"></span>
+        </div>
+      </div>
+      <div class="finish-score-actions" id="finish-score-actions">
+        <div class="finish-buttons finish-buttons--score">
+          <button type="button" class="btn btn-finish-share" id="btn-finish-share"></button>
+          <button type="button" class="btn" id="btn-finish-continue"></button>
         </div>
       </div>
       <div class="finish-results" id="finish-results">
@@ -211,6 +217,8 @@
       const screenFinish = document.getElementById('screen-finish');
       const btnStart = document.getElementById('btn-start');
       const btnRepeat = document.getElementById('btn-repeat');
+      const btnFinishShare = document.getElementById('btn-finish-share');
+      const btnFinishContinue = document.getElementById('btn-finish-continue');
       const timerEl = document.getElementById('timer');
       const timerProgressEl = document.getElementById('timer-progress');
       const scoreCountEl = document.getElementById('score-count');
@@ -245,6 +253,8 @@
           'aria-label',
           t('finish.tokensLabel')
         );
+        btnFinishShare.textContent = t('finish.buttonShare');
+        btnFinishContinue.textContent = t('finish.buttonContinue');
         btnRepeat.textContent = t('finish.buttonClaimReward');
       }
 
@@ -696,21 +706,28 @@
         claimNavDone = false;
         screenStart.classList.remove('active');
         screenGame.classList.remove('active');
-        screenFinish.classList.remove('active', 'finish-play', 'finish-ready', 'finish-complete', 'finish-claiming');
+        screenFinish.classList.remove(
+          'active',
+          'finish-phase-score',
+          'finish-phase-reward',
+          'finish-play',
+          'finish-ready',
+          'finish-complete',
+          'finish-claiming'
+        );
         document.body.classList.remove('finish-active');
         clearClaimRewardHandlers();
         clearFinishReadyTimers();
         btnRepeat.disabled = false;
+        btnFinishContinue.disabled = false;
 
         if (screen === screenFinish) {
           document.body.classList.add('finish-active');
           resetFinishTokenDisplay();
           finishTokenCountupStarted = false;
-          screenFinish.classList.add('active');
-          void screenFinish.offsetWidth;
-          screenFinish.classList.add('finish-play');
+          document.getElementById('finish-title').textContent = t('finish.title');
+          screenFinish.classList.add('active', 'finish-phase-score');
           spawnFinishConfetti();
-          scheduleFinishReady();
           return;
         }
 
@@ -719,6 +736,72 @@
         resetFinishTokenDisplay();
         trainTokensEarned = 0;
         screen.classList.add('active');
+      }
+
+      function enterFinishRewardPhase() {
+        if (!screenFinish.classList.contains('active')) return;
+        if (screenFinish.classList.contains('finish-phase-reward')) return;
+        btnFinishContinue.disabled = true;
+        document.getElementById('finish-title').textContent = t('finish.titleReward');
+        screenFinish.classList.remove('finish-phase-score');
+        screenFinish.classList.add('finish-phase-reward');
+        void screenFinish.offsetWidth;
+        screenFinish.classList.add('finish-play');
+        scheduleFinishReady();
+      }
+
+      function getReferralId() {
+        const fromUrl = urlParams.get('ref');
+        if (fromUrl) return fromUrl;
+
+        const tg = window.Telegram && window.Telegram.WebApp;
+        const tgUserId = tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id;
+        if (tgUserId) return String(tgUserId);
+
+        try {
+          const stored = localStorage.getItem('tma_pairs_ref_id');
+          if (stored) return stored;
+          const generated = 'u' + Math.random().toString(36).slice(2, 11);
+          localStorage.setItem('tma_pairs_ref_id', generated);
+          return generated;
+        } catch (error) {
+          return 'guest' + Date.now().toString(36);
+        }
+      }
+
+      function buildReferralUrl(refId) {
+        const url = new URL('index.html', window.location.href);
+        url.searchParams.set('ref', refId);
+        if (activeLocale !== DEFAULT_LOCALE) {
+          url.searchParams.set('lang', activeLocale);
+        }
+        return url.toString();
+      }
+
+      function shareWithFriend() {
+        const referralUrl = buildReferralUrl(getReferralId());
+        const shareText = t('share.shareText');
+        const tg = window.Telegram && window.Telegram.WebApp;
+        const shareUrl = 'https://t.me/share/url?url=' + encodeURIComponent(referralUrl)
+          + '&text=' + encodeURIComponent(shareText);
+
+        if (tg && typeof tg.openTelegramLink === 'function') {
+          tg.openTelegramLink(shareUrl);
+          return;
+        }
+
+        if (navigator.share) {
+          navigator.share({
+            title: t('share.title'),
+            text: shareText,
+            url: referralUrl,
+          }).catch(function (error) {
+            if (error && error.name === 'AbortError') return;
+          });
+          return;
+        }
+
+        window.open(shareUrl, '_blank', 'noopener,noreferrer');
       }
 
       function shuffle(array) {
@@ -914,8 +997,17 @@
       };
 
       btnStart.addEventListener('click', startGame);
+      btnFinishShare.addEventListener('click', function () {
+        if (!screenFinish.classList.contains('finish-phase-score')) return;
+        shareWithFriend();
+      });
+      btnFinishContinue.addEventListener('click', function () {
+        if (!screenFinish.classList.contains('finish-phase-score')) return;
+        enterFinishRewardPhase();
+      });
       btnRepeat.addEventListener('click', function () {
         if (!screenFinish.classList.contains('active')) return;
+        if (!screenFinish.classList.contains('finish-phase-reward')) return;
         if (screenFinish.classList.contains('finish-claiming')) return;
         screenFinish.classList.add('finish-claiming');
         btnRepeat.disabled = true;

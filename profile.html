@@ -20,18 +20,16 @@
 
       <section class="profile-summary" aria-labelledby="profile-summary-label">
         <span class="profile-summary-label" id="profile-summary-label"></span>
-        <div class="profile-summary-total" id="profile-total-tokens">0</div>
+        <div class="profile-summary-total-row">
+          <span class="profile-summary-token-icon" aria-hidden="true"></span>
+          <div class="profile-summary-total" id="profile-total-tokens">0</div>
+        </div>
         <p class="profile-summary-meta" id="profile-week-meta"></p>
       </section>
 
       <section aria-labelledby="profile-types-title">
         <h2 class="profile-section-title" id="profile-types-title"></h2>
         <div class="profile-token-grid" id="profile-token-grid"></div>
-      </section>
-
-      <section aria-labelledby="profile-week-title">
-        <h2 class="profile-section-title" id="profile-week-title"></h2>
-        <div class="profile-week-list" id="profile-week-list"></div>
       </section>
 
       <div class="profile-actions">
@@ -163,12 +161,6 @@
         }[type] || { iconSrc: TOKEN_ICON_SRC.memory, label: type };
       }
 
-      function gameLabel(gameId) {
-        const key = 'profile.games.' + gameId;
-        const label = t(key);
-        return label === key ? gameId : label;
-      }
-
       function renderTokenGrid(totals, lastByType) {
         const grid = document.getElementById('profile-token-grid');
         grid.innerHTML = '';
@@ -193,29 +185,6 @@
             '<div class="profile-token-total">' + formatNumber(totals.byType[type] || 0) + '</div>' +
             '<div class="profile-token-last">' + lastHtml + '</div>';
           grid.appendChild(card);
-        });
-      }
-
-      function renderWeekSessions(sessions) {
-        const list = document.getElementById('profile-week-list');
-        list.innerHTML = '';
-        if (!sessions.length) {
-          const empty = document.createElement('p');
-          empty.className = 'profile-empty';
-          empty.textContent = t('profile.weekEmpty');
-          list.appendChild(empty);
-          return;
-        }
-        sessions.slice(0, 12).forEach(function (session) {
-          const item = document.createElement('div');
-          item.className = 'profile-week-item';
-          item.innerHTML =
-            '<div class="profile-week-main">' +
-              '<span class="profile-week-game">' + gameLabel(session.gameId) + '</span>' +
-              '<span class="profile-week-date">' + formatSessionDate(session.endedAt) + '</span>' +
-            '</div>' +
-            '<span class="profile-week-tokens">+' + formatNumber(session.tokens) + '</span>';
-          list.appendChild(item);
         });
       }
 
@@ -245,12 +214,10 @@
           .replace('{sessions}', formatNumber(weekSessions.length))
           .replace('{tokens}', formatNumber(weekTokens));
         document.getElementById('profile-types-title').textContent = t('profile.tokenTypesTitle');
-        document.getElementById('profile-week-title').textContent = t('profile.weekTitle');
         document.getElementById('btn-play').textContent = t('profile.backToGame');
         document.getElementById('btn-share').textContent = t('profile.inviteFriends');
 
         renderTokenGrid(totals, lastByType);
-        renderWeekSessions(weekSessions);
       }
 
       renderProfile();

@@ -40,8 +40,11 @@ window.TMA_I18N = {
     },
     "finish": {
       "title": "Игра окончена",
+      "titleReward": "Вы заработали",
       "scoreLabel": "отгадано пар",
       "tokensLabel": "токенов за тренировку",
+      "buttonShare": "Поделиться с другом",
+      "buttonContinue": "Продолжить",
       "buttonClaimReward": "Забрать награду"
     },
     "share": {
@@ -144,8 +147,11 @@ window.TMA_I18N = {
     },
     "finish": {
       "title": "Game over",
+      "titleReward": "You earned",
       "scoreLabel": "pairs cleared",
       "tokensLabel": "tokens for this training",
+      "buttonShare": "Share with a friend",
+      "buttonContinue": "Continue",
       "buttonClaimReward": "Claim reward"
     },
     "share": {

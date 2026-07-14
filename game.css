@@ -1466,6 +1466,41 @@ body.finish-active .app {
   pointer-events: none;
 }
 
+.finish-score-actions {
+  position: relative;
+  z-index: 2;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  margin-top: 28px;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(12px);
+  pointer-events: none;
+}
+
+#screen-finish.finish-phase-score .finish-score-actions {
+  display: flex;
+  animation: finish-results-in 0.55s ease-out 0.25s forwards;
+  pointer-events: auto;
+}
+
+#screen-finish.finish-phase-score .finish-chest-stage,
+#screen-finish.finish-phase-score .finish-token-reward,
+#screen-finish.finish-phase-score .finish-results {
+  display: none !important;
+}
+
+#screen-finish.finish-phase-reward .finish-score-block {
+  display: none;
+}
+
+#screen-finish.finish-phase-reward .finish-score-actions {
+  display: none;
+}
+
 #screen-finish.finish-ready .finish-results {
   animation: finish-results-in 0.65s ease-out forwards;
   animation-delay: 2.4s;
@@ -1591,6 +1626,64 @@ body.finish-active .app {
   justify-content: center;
 }
 
+.finish-buttons--score {
+  flex-direction: column;
+  align-items: stretch;
+  width: min(100%, 320px);
+  gap: 10px;
+}
+
+.btn-finish-share {
+  min-width: 0;
+  width: 100%;
+  background-color: rgba(20, 36, 28, 0.72);
+  background-image: none;
+  border: 1px solid rgba(143, 224, 168, 0.28);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  color: #e8f5ec;
+}
+
+.btn-finish-share:hover {
+  background-color: rgba(36, 62, 48, 0.9);
+  background-image: none;
+  transform: scale(1.02);
+}
+
+.btn-finish-share:active {
+  transform: scale(0.98);
+}
+
+#btn-finish-continue {
+  min-width: 0;
+  width: 100%;
+  padding: 16px 28px;
+  font-size: 1.2rem;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background-color: #3d7a4d;
+  background-image: linear-gradient(160deg, #5a9f6b 0%, #3d7a4d 42%, #2d5c3a 100%);
+  box-shadow:
+    0 2px 0 #1a3d28,
+    inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  color: #f4fdf6;
+  text-shadow: 0 1px 1px rgba(10, 30, 16, 0.35);
+}
+
+#btn-finish-continue:hover:not(:disabled) {
+  background-color: #4a8f5c;
+  background-image: linear-gradient(160deg, #6cb37d 0%, #4a8f5c 45%, #356d44 100%);
+  transform: scale(1.02);
+}
+
+#btn-finish-continue:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+#btn-finish-continue:disabled {
+  cursor: default;
+  opacity: 0.85;
+}
+
 .finish-header {
   position: relative;
   z-index: 2;
@@ -1613,6 +1706,12 @@ body.finish-active .app {
 #screen-finish.finish-ready .finish-header-top {
   animation: finish-header-shift-up 1.15s cubic-bezier(0.22, 0.88, 0.32, 1) forwards;
   animation-delay: 1.85s;
+}
+
+/* Score is hidden on reward phase — keep title in place above tokens */
+#screen-finish.finish-phase-reward.finish-ready .finish-header-top {
+  animation: none;
+  transform: none;
 }
 
 .finish-score-block {
@@ -2205,6 +2304,10 @@ body.finish-active .app {
     transform: translateY(-92px);
   }
 
+  #screen-finish.finish-phase-reward.finish-ready .finish-header-top {
+    transform: none;
+  }
+
   #screen-finish.finish-ready .finish-token-reward {
     opacity: 1;
     visibility: visible;
@@ -2216,7 +2319,9 @@ body.finish-active .app {
   #screen-finish.finish-ready .finish-results,
   #screen-finish.finish-complete .finish-results,
   .finish-token-reward,
-  #screen-finish.finish-ready .finish-token-reward {
+  #screen-finish.finish-ready .finish-token-reward,
+  .finish-score-actions,
+  #screen-finish.finish-phase-score .finish-score-actions {
     opacity: 1;
     visibility: visible;
     pointer-events: auto;
