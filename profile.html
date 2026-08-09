@@ -100,29 +100,26 @@
         return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
       }
 
-      function formatSessionDate(iso) {
-        const date = new Date(iso);
-        if (isNaN(date.getTime())) return '—';
-        if (activeLocale === 'ru') {
-          const now = new Date();
-          const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-          const dayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
-          const hours = String(date.getHours()).padStart(2, '0');
-          const minutes = String(date.getMinutes()).padStart(2, '0');
-          if (dayStart === todayStart) return t('profile.today') + ', ' + hours + ':' + minutes;
-          if (dayStart === todayStart - 86400000) return t('profile.yesterday') + ', ' + hours + ':' + minutes;
-          const months = ['янв.', 'февр.', 'мар.', 'апр.', 'мая', 'июн.', 'июл.', 'авг.', 'сент.', 'окт.', 'нояб.', 'дек.'];
-          return date.getDate() + ' ' + months[date.getMonth()] + ', ' + hours + ':' + minutes;
-        }
-        const now = new Date();
-        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-        const dayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
-        const hours = String(date.getHours()).padStart(2, '0');
-        const minutes = String(date.getMinutes()).padStart(2, '0');
-        if (dayStart === todayStart) return 'Today, ' + hours + ':' + minutes;
-        if (dayStart === todayStart - 86400000) return 'Yesterday, ' + hours + ':' + minutes;
-        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-        return months[date.getMonth()] + ' ' + date.getDate() + ', ' + hours + ':' + minutes;
+      function renderTokenGrid(totals) {
+        const grid = document.getElementById('profile-token-grid');
+        grid.innerHTML = '';
+        const types = window.TMA_PROFILE_STORE.TOKEN_TYPES;
+        types.forEach(function (type) {
+          const meta = tokenTypeMeta(type);
+          const card = document.createElement('article');
+          card.className = 'profile-token-card';
+          card.innerHTML =
+            '<div class="profile-token-head">' +
+              '<span class="profile-token-icon profile-token-icon--' + type + '" aria-hidden="true">' +
+                '<img class="profile-token-icon-img" src="' + meta.iconSrc + '" alt="" width="36" height="36" />' +
+              '</span>' +
+              '<div class="profile-token-meta">' +
+                '<div class="profile-token-total">' + formatNumber(totals.byType[type] || 0) + '</div>' +
+                '<span class="profile-token-name">' + meta.label + '</span>' +
+              '</div>' +
+            '</div>';
+          grid.appendChild(card);
+        });
       }
 
       function getDisplayName() {
@@ -161,33 +158,6 @@
         }[type] || { iconSrc: TOKEN_ICON_SRC.memory, label: type };
       }
 
-      function renderTokenGrid(totals, lastByType) {
-        const grid = document.getElementById('profile-token-grid');
-        grid.innerHTML = '';
-        const types = window.TMA_PROFILE_STORE.TOKEN_TYPES;
-        types.forEach(function (type) {
-          const meta = tokenTypeMeta(type);
-          const card = document.createElement('article');
-          card.className = 'profile-token-card';
-          const last = lastByType[type];
-          const lastHtml = last
-            ? t('profile.lastTrainTokens')
-                .replace('{tokens}', '<strong>+' + formatNumber(last.tokens) + '</strong>')
-                .replace('{date}', formatSessionDate(last.endedAt))
-            : t('profile.noTrainThisWeek');
-          card.innerHTML =
-            '<div class="profile-token-head">' +
-              '<span class="profile-token-icon profile-token-icon--' + type + '" aria-hidden="true">' +
-                '<img class="profile-token-icon-img" src="' + meta.iconSrc + '" alt="" width="36" height="36" />' +
-              '</span>' +
-              '<span class="profile-token-name">' + meta.label + '</span>' +
-            '</div>' +
-            '<div class="profile-token-total">' + formatNumber(totals.byType[type] || 0) + '</div>' +
-            '<div class="profile-token-last">' + lastHtml + '</div>';
-          grid.appendChild(card);
-        });
-      }
-
       function renderProfile() {
         const storeApi = window.TMA_PROFILE_STORE;
         if (!storeApi) return;
@@ -198,7 +168,6 @@
 
         const totals = storeApi.getTotals();
         const weekSessions = storeApi.getWeekSessions();
-        const lastByType = storeApi.getLastSessionPerTypeForWeek();
         const weekTokens = weekSessions.reduce(function (sum, s) {
           return sum + (s.tokens || 0);
         }, 0);
@@ -217,7 +186,7 @@
         document.getElementById('btn-play').textContent = t('profile.backToGame');
         document.getElementById('btn-share').textContent = t('profile.inviteFriends');
 
-        renderTokenGrid(totals, lastByType);
+        renderTokenGrid(totals);
       }
 
       renderProfile();
